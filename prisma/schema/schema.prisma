@@ -1,0 +1,14 @@
+// Nexora multi-tenant schema. All Nexora-owned models live in the `app` Postgres schema.
+// RLS policies, functions, triggers and stored procedures are applied via raw SQL
+// migrations (see prisma/migrations) — Prisma manages tables/indexes only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["app"]
+}

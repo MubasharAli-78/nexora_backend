@@ -1,0 +1,90 @@
+/// Tenancy: tenants, domains, memberships, invitations.
+
+model Tenant {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String    @unique
+  status          String    @default("trialing") // trialing/active/suspended/cancelled
+  planKey         String    @default("free") @map("plan_key")
+  timezone        String    @default("UTC")
+  defaultCurrency String    @default("USD") @map("default_currency") @db.Char(3)
+  ownerUserId     String?   @map("owner_user_id") @db.Uuid
+  rbacVersion     Int       @default(1) @map("rbac_version")
+  settingsJson    Json      @default("{}") @map("settings_json")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+
+  domains     TenantDomain[]
+  memberships TenantMembership[]
+  invitations TenantInvitation[]
+  roles       Role[]
+  stores      Store[]
+
+  @@index([status])
+  @@index([ownerUserId])
+  @@index([planKey])
+  @@map("tenants")
+  @@schema("app")
+}
+
+model TenantDomain {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  domain     String    @unique
+  domainType String    @default("system") @map("domain_type") // system/custom
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+  @@schema("app")
+}
+
+model TenantMembership {
+  id                           String    @id @default(uuid()) @db.Uuid
+  tenantId                     String    @map("tenant_id") @db.Uuid
+  userId                       String    @map("user_id") @db.Uuid
+  status                       String    @default("active") // active/invited/suspended/removed
+  membershipPermissionVersion  Int       @default(1) @map("membership_permission_version")
+  joinedAt                     DateTime? @map("joined_at") @db.Timestamptz
+  invitedByUserId              String?   @map("invited_by_user_id") @db.Uuid
+  lastAccessedAt               DateTime? @map("last_accessed_at") @db.Timestamptz
+  createdAt                    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleAssignments RoleAssignment[]
+
+  @@unique([tenantId, userId])
+  @@index([userId, status])
+  @@index([tenantId, status])
+  @@index([tenantId, membershipPermissionVersion])
+  @@map("tenant_memberships")
+  @@schema("app")
+}
+
+model TenantInvitation {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  emailNormalized String    @map("email_normalized")
+  invitedByUserId String    @map("invited_by_user_id") @db.Uuid
+  assignedRoleId  String    @map("assigned_role_id") @db.Uuid
+  status          String    @default("pending") // pending/accepted/expired/revoked
+  tokenHash       String    @map("token_hash")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt      DateTime? @map("accepted_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [assignedRoleId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tokenHash])
+  @@map("tenant_invitations")
+  @@schema("app")
+}

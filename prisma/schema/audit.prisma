@@ -1,0 +1,43 @@
+/// Immutable audit log + transactional outbox.
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid // null for platform events
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  action       String
+  resourceType String?  @map("resource_type")
+  resourceId   String?  @map("resource_id") @db.Uuid
+  beforeJson   Json?    @map("before_json")
+  afterJson    Json?    @map("after_json")
+  ipAddress    String?  @map("ip_address") @db.Inet
+  userAgent    String?  @map("user_agent")
+  requestId    String?  @map("request_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([resourceType, resourceId])
+  @@index([requestId])
+  @@map("audit_logs")
+  @@schema("app")
+}
+
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  eventType     String    @map("event_type")
+  aggregateType String?   @map("aggregate_type")
+  aggregateId   String?   @map("aggregate_id") @db.Uuid
+  payloadJson   Json      @default("{}") @map("payload_json")
+  status        String    @default("pending") // pending/processing/published/failed
+  attemptCount  Int       @default(0) @map("attempt_count")
+  availableAt   DateTime  @default(now()) @map("available_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz
+
+  @@index([status, availableAt])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([aggregateType, aggregateId])
+  @@map("outbox_events")
+  @@schema("app")
+}

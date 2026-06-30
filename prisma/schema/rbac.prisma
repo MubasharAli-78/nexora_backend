@@ -1,0 +1,85 @@
+/// RBAC: permissions, roles, role-permission map, role assignments.
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid // null = system/global permission
+  key         String
+  module      String
+  action      String
+  description String?
+  riskLevel   String   @default("low") @map("risk_level") // low/medium/high/critical
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  @@index([module, action])
+  @@index([tenantId, module])
+  @@map("permissions")
+  @@schema("app")
+}
+
+model Role {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String?  @map("tenant_id") @db.Uuid // null = global template
+  key             String
+  name            String
+  description     String?
+  scopeLevel      String   @default("tenant") @map("scope_level") // tenant/store
+  isSystem        Boolean  @default(false) @map("is_system")
+  isDefault       Boolean  @default(false) @map("is_default")
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant          Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions     RolePermission[]
+  assignments     RoleAssignment[]
+  invitations     TenantInvitation[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, isSystem])
+  @@index([tenantId, scopeLevel])
+  @@map("roles")
+  @@schema("app")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([tenantId, roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+  @@schema("app")
+}
+
+model RoleAssignment {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  membershipId    String   @map("membership_id") @db.Uuid
+  roleId          String   @map("role_id") @db.Uuid
+  scopeType       String   @default("tenant") @map("scope_type") // tenant/store
+  scopeId         String?  @map("scope_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  membership TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role       Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, membershipId, roleId, scopeType, scopeId])
+  @@index([tenantId, membershipId])
+  @@index([tenantId, scopeType, scopeId])
+  // Speeds the "bump permission version for everyone with this role" update that
+  // runs on every role-permission save (filters by tenant_id + role_id).
+  @@index([tenantId, roleId, membershipId])
+  @@map("role_assignments")
+  @@schema("app")
+}

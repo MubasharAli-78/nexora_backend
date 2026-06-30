@@ -1,0 +1,127 @@
+/// Integration providers + per-tenant connections, credentials, mappings, sync runs, webhooks.
+
+model IntegrationProvider {
+  id                 String   @id @default(uuid()) @db.Uuid
+  key                String   @unique // shopify/woocommerce/amazon
+  name               String
+  category           String   @default("commerce") // commerce/email/ads/analytics
+  status             String   @default("active") // active/coming_soon
+  requiredScopesJson Json     @default("[]") @map("required_scopes_json")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  integrations TenantIntegration[]
+
+  @@map("integration_providers")
+  @@schema("app")
+}
+
+model TenantIntegration {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  storeId            String?   @map("store_id") @db.Uuid
+  providerId         String    @map("provider_id") @db.Uuid
+  displayName        String?   @map("display_name")
+  status             String    @default("connected") // connected/error/revoked/disabled
+  externalAccountId  String?   @map("external_account_id")
+  externalShopDomain String?   @map("external_shop_domain")
+  scopesJson         Json      @default("[]") @map("scopes_json")
+  lastSyncAt         DateTime? @map("last_sync_at") @db.Timestamptz
+  syncMode           String    @default("manual") @map("sync_mode") // manual/scheduled/webhook
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  provider    IntegrationProvider     @relation(fields: [providerId], references: [id])
+  credentials IntegrationCredential[]
+  syncRuns    SyncRun[]
+
+  @@unique([tenantId, providerId, externalAccountId])
+  @@index([tenantId, storeId])
+  @@index([tenantId, status])
+  @@map("tenant_integrations")
+  @@schema("app")
+}
+
+model IntegrationCredential {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  integrationId       String    @map("integration_id") @db.Uuid
+  secretProvider      String    @default("app_encrypted") @map("secret_provider")
+  encryptedSecretJson Json      @map("encrypted_secret_json")
+  tokenLast4          String?   @map("token_last4")
+  expiresAt           DateTime? @map("expires_at") @db.Timestamptz
+  rotatedAt           DateTime? @map("rotated_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  integration TenantIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("integration_credentials")
+  @@schema("app")
+}
+
+model ExternalObjectMapping {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  storeId           String   @map("store_id") @db.Uuid
+  integrationId     String   @map("integration_id") @db.Uuid
+  objectType        String   @map("object_type") // product/customer/order/etc
+  externalId        String   @map("external_id")
+  externalGraphqlId String?  @map("external_graphql_id")
+  localTable        String   @map("local_table")
+  localId           String   @map("local_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([tenantId, integrationId, objectType, externalId])
+  @@index([tenantId, storeId, objectType])
+  @@index([localTable, localId])
+  @@map("external_object_mappings")
+  @@schema("app")
+}
+
+model SyncRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  storeId        String?   @map("store_id") @db.Uuid
+  integrationId  String    @map("integration_id") @db.Uuid
+  syncType       String    @map("sync_type") // products/customers/orders/full
+  status         String    @default("queued") // queued/running/success/failed
+  startedAt      DateTime? @map("started_at") @db.Timestamptz
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz
+  recordsRead    Int       @default(0) @map("records_read")
+  recordsCreated Int       @default(0) @map("records_created")
+  recordsUpdated Int       @default(0) @map("records_updated")
+  recordsFailed  Int       @default(0) @map("records_failed")
+  errorMessage   String?   @map("error_message")
+  cursorBefore   String?   @map("cursor_before")
+  cursorAfter    String?   @map("cursor_after")
+
+  integration TenantIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, integrationId, startedAt(sort: Desc)])
+  @@index([tenantId, storeId, syncType])
+  @@index([tenantId, status])
+  @@map("sync_runs")
+  @@schema("app")
+}
+
+model WebhookEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String?   @map("tenant_id") @db.Uuid
+  integrationId   String?   @map("integration_id") @db.Uuid
+  providerKey     String    @map("provider_key")
+  eventType       String    @map("event_type")
+  externalEventId String    @map("external_event_id")
+  headersJson     Json      @default("{}") @map("headers_json")
+  payloadJson     Json      @default("{}") @map("payload_json")
+  signatureValid  Boolean   @default(false) @map("signature_valid")
+  status          String    @default("received") // received/processed/failed
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz
+
+  @@unique([providerKey, externalEventId])
+  @@index([tenantId, status, receivedAt(sort: Desc)])
+  @@index([providerKey, eventType, receivedAt(sort: Desc)])
+  @@map("webhook_events")
+  @@schema("app")
+}

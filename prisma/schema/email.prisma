@@ -1,0 +1,57 @@
+/// Email marketing: campaigns, flows, events.
+
+model EmailCampaign {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  storeId      String?   @map("store_id") @db.Uuid
+  name         String
+  subject      String?
+  status       String    @default("draft") // draft/scheduled/sending/sent/paused
+  audienceJson Json      @default("{}") @map("audience_json")
+  scheduledAt  DateTime? @map("scheduled_at") @db.Timestamptz
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz
+  recipients   Int       @default(0)
+  opens        Int       @default(0)
+  clicks       Int       @default(0)
+  revenue      Decimal   @default(0) @db.Decimal(14, 2)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  events EmailEvent[]
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@map("email_campaigns")
+  @@schema("app")
+}
+
+model EmailFlow {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String?  @map("store_id") @db.Uuid
+  name        String
+  trigger     String   // welcome/abandoned_cart/post_purchase/winback
+  status      String   @default("active") // active/paused
+  stepsJson   Json     @default("[]") @map("steps_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([tenantId, status])
+  @@map("email_flows")
+  @@schema("app")
+}
+
+model EmailEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  campaignId  String?  @map("campaign_id") @db.Uuid
+  flowId      String?  @map("flow_id") @db.Uuid
+  eventType   String   @map("event_type") // delivered/open/click/bounce/unsubscribe
+  recipient   String?
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  campaign EmailCampaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventType, occurredAt(sort: Desc)])
+  @@map("email_events")
+  @@schema("app")
+}

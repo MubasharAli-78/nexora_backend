@@ -1,0 +1,26 @@
+/// Merchant stores. One tenant can own many stores.
+
+model Store {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  slug          String
+  platform      String    @default("manual") // shopify/woocommerce/amazon/manual
+  primaryDomain String?   @map("primary_domain")
+  timezone      String    @default("UTC")
+  currency      String    @default("USD") @db.Char(3)
+  status        String    @default("active") // active/paused/disconnected
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+  orders   Order[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@index([tenantId, platform])
+  @@map("stores")
+  @@schema("app")
+}

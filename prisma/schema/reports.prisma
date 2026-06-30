@@ -1,0 +1,23 @@
+/// Generated report runs (files land in app.files).
+
+model ReportRun {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  storeId      String?   @map("store_id") @db.Uuid
+  reportKey    String    @map("report_key") // sales/inventory/customers/custom
+  status       String    @default("queued") // queued/running/success/failed
+  format       String    @default("csv") // csv/pdf/xlsx
+  paramsJson   Json      @default("{}") @map("params_json")
+  fileId       String?   @map("file_id") @db.Uuid
+  rowCount     Int?      @map("row_count")
+  errorMessage String?   @map("error_message")
+  requestedByUserId String? @map("requested_by_user_id") @db.Uuid
+  startedAt    DateTime? @map("started_at") @db.Timestamptz
+  finishedAt   DateTime? @map("finished_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, reportKey])
+  @@map("report_runs")
+  @@schema("app")
+}

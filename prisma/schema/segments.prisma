@@ -1,0 +1,35 @@
+/// Customer segments + memberships.
+
+model CustomerSegment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  storeId      String?  @map("store_id") @db.Uuid
+  name         String
+  description  String?
+  definitionJson Json   @default("{}") @map("definition_json") // rule-based definition
+  isDynamic    Boolean  @default(true) @map("is_dynamic")
+  memberCount  Int      @default(0) @map("member_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships CustomerSegmentMembership[]
+
+  @@index([tenantId, storeId])
+  @@map("customer_segments")
+  @@schema("app")
+}
+
+model CustomerSegmentMembership {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  segmentId  String   @map("segment_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  addedAt    DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  segment CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, segmentId, customerId])
+  @@index([tenantId, customerId])
+  @@map("customer_segment_memberships")
+  @@schema("app")
+}

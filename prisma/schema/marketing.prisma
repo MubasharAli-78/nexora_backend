@@ -1,0 +1,50 @@
+/// Marketing campaigns + daily campaign metrics.
+
+model Campaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  storeId        String?   @map("store_id") @db.Uuid
+  channelKey     String    @map("channel_key") // facebook/email/google/etc
+  externalId     String?   @map("external_id")
+  name           String
+  status         String    @default("active") // active/paused/ended
+  objective      String?   // sales/traffic/etc
+  startedAt      DateTime? @map("started_at") @db.Timestamptz
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz
+  budgetAmount   Decimal   @default(0) @map("budget_amount") @db.Decimal(14, 2)
+  currency       String    @default("USD") @db.Char(3)
+  rawPayloadJson Json?     @map("raw_payload_json")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  metrics CampaignMetricsDaily[]
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, channelKey])
+  @@map("campaigns")
+  @@schema("app")
+}
+
+model CampaignMetricsDaily {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String?  @map("store_id") @db.Uuid
+  campaignId  String   @map("campaign_id") @db.Uuid
+  metricDate  DateTime @map("metric_date") @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Decimal  @default(0) @db.Decimal(14, 2)
+  revenue     Decimal  @default(0) @db.Decimal(14, 2)
+  orders      Int      @default(0)
+  roas        Decimal  @default(0) @db.Decimal(10, 4)
+  ctr         Decimal  @default(0) @db.Decimal(10, 4)
+  cpc         Decimal  @default(0) @db.Decimal(14, 4)
+  cpa         Decimal  @default(0) @db.Decimal(14, 4)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, campaignId, metricDate])
+  @@index([tenantId, campaignId, metricDate(sort: Desc)])
+  @@map("campaign_metrics_daily")
+  @@schema("app")
+}

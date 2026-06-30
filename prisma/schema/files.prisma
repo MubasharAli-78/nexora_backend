@@ -1,0 +1,25 @@
+/// Application-owned file metadata. Bytes live in Supabase Storage; ownership lives here.
+
+model File {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  storeId          String?   @map("store_id") @db.Uuid
+  bucket           String
+  objectKey        String    @map("object_key")
+  fileName         String    @map("file_name")
+  mimeType         String?   @map("mime_type")
+  sizeBytes        BigInt?   @map("size_bytes")
+  checksumSha256   String?   @map("checksum_sha256")
+  visibility       String    @default("private") // private/public/signed
+  purpose          String?   // avatar/product/export/report
+  uploadedByUserId String?   @map("uploaded_by_user_id") @db.Uuid
+  status           String    @default("pending") // pending/available/deleted/quarantined
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@unique([bucket, objectKey])
+  @@index([tenantId, storeId, purpose])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@map("files")
+  @@schema("app")
+}

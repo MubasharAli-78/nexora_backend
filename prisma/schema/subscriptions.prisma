@@ -1,0 +1,41 @@
+/// Subscription contracts + lifecycle events (recurring commerce).
+
+model SubscriptionContract {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  storeId         String    @map("store_id") @db.Uuid
+  customerId      String?   @map("customer_id") @db.Uuid
+  externalId      String?   @map("external_id")
+  status          String    @default("active") // active/paused/cancelled/expired
+  intervalUnit    String    @default("month") @map("interval_unit") // day/week/month/year
+  intervalCount   Int       @default(1) @map("interval_count")
+  amount          Decimal   @default(0) @db.Decimal(14, 2)
+  currency        String    @default("USD") @db.Char(3)
+  nextBillingAt   DateTime? @map("next_billing_at") @db.Timestamptz
+  startedAt       DateTime? @map("started_at") @db.Timestamptz
+  cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  events SubscriptionEvent[]
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, nextBillingAt])
+  @@map("subscription_contracts")
+  @@schema("app")
+}
+
+model SubscriptionEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  contractId     String   @map("contract_id") @db.Uuid
+  eventType      String   @map("event_type") // created/renewed/paused/resumed/cancelled/payment_failed
+  amount         Decimal? @db.Decimal(14, 2)
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  contract SubscriptionContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, contractId, occurredAt(sort: Desc)])
+  @@map("subscription_events")
+  @@schema("app")
+}

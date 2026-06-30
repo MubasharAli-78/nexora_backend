@@ -1,0 +1,221 @@
+/// Canonical commerce tables: products, variants, images, customers, addresses, orders, items.
+
+model Product {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  storeId             String    @map("store_id") @db.Uuid
+  externalSource      String    @default("manual") @map("external_source")
+  externalId          String    @map("external_id")
+  externalGraphqlId   String?   @map("external_graphql_id")
+  title               String
+  handle              String?
+  description         String?
+  vendor              String?
+  productType         String?   @map("product_type")
+  status              String    @default("active") // active/draft/archived
+  featuredImageFileId String?   @map("featured_image_file_id") @db.Uuid
+  featuredImageUrl    String?   @map("featured_image_url")
+  tagsJson            Json      @default("[]") @map("tags_json")
+  rawPayloadJson      Json?     @map("raw_payload_json")
+  sourceCreatedAt     DateTime? @map("source_created_at") @db.Timestamptz
+  sourceUpdatedAt     DateTime? @map("source_updated_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz
+
+  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants ProductVariant[]
+  images   ProductImage[]
+
+  @@unique([tenantId, storeId, externalSource, externalId])
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, storeId, productType])
+  @@index([tenantId, storeId, handle])
+  @@map("products")
+  @@schema("app")
+}
+
+model ProductVariant {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  storeId              String    @map("store_id") @db.Uuid
+  productId            String    @map("product_id") @db.Uuid
+  externalId           String    @map("external_id")
+  externalGraphqlId    String?   @map("external_graphql_id")
+  title                String?
+  sku                  String?
+  barcode              String?
+  priceAmount          Decimal   @default(0) @map("price_amount") @db.Decimal(14, 2)
+  compareAtPriceAmount Decimal?  @map("compare_at_price_amount") @db.Decimal(14, 2)
+  currency             String    @default("USD") @db.Char(3)
+  inventoryPolicy      String?   @map("inventory_policy")
+  position             Int       @default(0)
+  rawPayloadJson       Json?     @map("raw_payload_json")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, storeId, externalId])
+  @@index([tenantId, productId])
+  @@index([tenantId, storeId, sku])
+  @@index([tenantId, storeId, barcode])
+  @@map("product_variants")
+  @@schema("app")
+}
+
+model ProductImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String   @map("store_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  fileId      String?  @map("file_id") @db.Uuid
+  externalUrl String?  @map("external_url")
+  altText     String?  @map("alt_text")
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productId])
+  @@map("product_images")
+  @@schema("app")
+}
+
+model CommerceCustomer {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  storeId           String    @map("store_id") @db.Uuid
+  externalSource    String    @default("manual") @map("external_source")
+  externalId        String    @map("external_id")
+  externalGraphqlId String?   @map("external_graphql_id")
+  firstName         String?   @map("first_name")
+  lastName          String?   @map("last_name")
+  displayName       String?   @map("display_name")
+  emailHash         String?   @map("email_hash")
+  emailEncrypted    String?   @map("email_encrypted")
+  phoneEncrypted    String?   @map("phone_encrypted")
+  state             String?   // enabled/disabled/invited
+  verifiedEmail     Boolean   @default(false) @map("verified_email")
+  taxExempt         Boolean   @default(false) @map("tax_exempt")
+  tagsJson          Json      @default("[]") @map("tags_json")
+  note              String?
+  numberOfOrders    Int       @default(0) @map("number_of_orders")
+  amountSpent       Decimal   @default(0) @map("amount_spent") @db.Decimal(14, 2)
+  currency          String    @default("USD") @db.Char(3)
+  lastOrderAt       DateTime? @map("last_order_at") @db.Timestamptz
+  sourceCreatedAt   DateTime? @map("source_created_at") @db.Timestamptz
+  sourceUpdatedAt   DateTime? @map("source_updated_at") @db.Timestamptz
+  rawPayloadJson    Json?     @map("raw_payload_json")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  addresses CustomerAddress[]
+  orders    Order[]
+
+  @@unique([tenantId, storeId, externalSource, externalId])
+  @@index([tenantId, storeId, emailHash])
+  @@index([tenantId, storeId, lastOrderAt(sort: Desc)])
+  @@map("commerce_customers")
+  @@schema("app")
+}
+
+model CustomerAddress {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  storeId           String   @map("store_id") @db.Uuid
+  customerId        String   @map("customer_id") @db.Uuid
+  externalId        String?  @map("external_id")
+  name              String?
+  company           String?
+  address1Encrypted String?  @map("address1_encrypted")
+  address2Encrypted String?  @map("address2_encrypted")
+  city              String?
+  province          String?
+  country           String?
+  countryCode       String?  @map("country_code") @db.Char(2)
+  zipEncrypted      String?  @map("zip_encrypted")
+  phoneEncrypted    String?  @map("phone_encrypted")
+  isDefault         Boolean  @default(false) @map("is_default")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  customer CommerceCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerId])
+  @@map("customer_addresses")
+  @@schema("app")
+}
+
+model Order {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  storeId            String    @map("store_id") @db.Uuid
+  customerId         String?   @map("customer_id") @db.Uuid
+  externalSource     String    @default("manual") @map("external_source")
+  externalId         String    @map("external_id")
+  externalName       String?   @map("external_name")
+  orderNumber        String?   @map("order_number")
+  financialStatus    String?   @map("financial_status") // paid/pending/refunded
+  fulfillmentStatus  String?   @map("fulfillment_status")
+  orderStatus        String?   @map("order_status") // processing/shipped/delivered/cancelled/at_risk
+  currency           String    @default("USD") @db.Char(3)
+  subtotalAmount     Decimal   @default(0) @map("subtotal_amount") @db.Decimal(14, 2)
+  shippingAmount     Decimal   @default(0) @map("shipping_amount") @db.Decimal(14, 2)
+  taxAmount          Decimal   @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  discountAmount     Decimal   @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  refundAmount       Decimal   @default(0) @map("refund_amount") @db.Decimal(14, 2)
+  totalAmount        Decimal   @default(0) @map("total_amount") @db.Decimal(14, 2)
+  paymentMethod      String?   @map("payment_method")
+  billingCountry     String?   @map("billing_country")
+  shippingCountry    String?   @map("shipping_country")
+  processedAt        DateTime? @map("processed_at") @db.Timestamptz
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
+  sourceCreatedAt    DateTime? @map("source_created_at") @db.Timestamptz
+  sourceUpdatedAt    DateTime? @map("source_updated_at") @db.Timestamptz
+  rawPayloadJson     Json?     @map("raw_payload_json")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  store    Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer CommerceCustomer? @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+
+  @@unique([tenantId, storeId, externalSource, externalId])
+  @@index([tenantId, storeId, processedAt(sort: Desc)])
+  @@index([tenantId, customerId, processedAt(sort: Desc)])
+  @@index([tenantId, storeId, financialStatus])
+  @@index([tenantId, storeId, orderStatus])
+  @@map("orders")
+  @@schema("app")
+}
+
+model OrderItem {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  storeId            String   @map("store_id") @db.Uuid
+  orderId            String   @map("order_id") @db.Uuid
+  productId          String?  @map("product_id") @db.Uuid
+  variantId          String?  @map("variant_id") @db.Uuid
+  externalLineItemId String?  @map("external_line_item_id")
+  title              String?
+  sku                String?
+  quantity           Int      @default(1)
+  unitPriceAmount    Decimal  @default(0) @map("unit_price_amount") @db.Decimal(14, 2)
+  discountAmount     Decimal  @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  taxAmount          Decimal  @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount        Decimal  @default(0) @map("total_amount") @db.Decimal(14, 2)
+  productType        String?  @map("product_type")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, productId])
+  @@index([tenantId, variantId])
+  @@index([tenantId, storeId, productType])
+  @@map("order_items")
+  @@schema("app")
+}

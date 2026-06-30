@@ -1,0 +1,79 @@
+/// Pre-computed rollup / fact tables that power dashboards quickly.
+
+model KpiSnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  storeId         String?  @map("store_id") @db.Uuid
+  snapshotAt      DateTime @default(now()) @map("snapshot_at") @db.Timestamptz
+  periodKey       String   @map("period_key") // today/7d/30d/mtd/ytd
+  revenue         Decimal  @default(0) @db.Decimal(14, 2)
+  ordersCount     Int      @default(0) @map("orders_count")
+  customersCount  Int      @default(0) @map("customers_count")
+  conversionRate  Decimal  @default(0) @map("conversion_rate") @db.Decimal(8, 4)
+  avgOrderValue   Decimal  @default(0) @map("avg_order_value") @db.Decimal(14, 2)
+  refundRate      Decimal  @default(0) @map("refund_rate") @db.Decimal(8, 4)
+  grossMargin     Decimal  @default(0) @map("gross_margin") @db.Decimal(14, 2)
+  metadataJson    Json     @default("{}") @map("metadata_json")
+
+  @@index([tenantId, storeId, periodKey, snapshotAt(sort: Desc)])
+  @@map("kpi_snapshots")
+  @@schema("app")
+}
+
+model DailySalesMetric {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  storeId        String   @map("store_id") @db.Uuid
+  metricDate     DateTime @map("metric_date") @db.Date
+  ordersCount    Int      @default(0) @map("orders_count")
+  grossSales     Decimal  @default(0) @map("gross_sales") @db.Decimal(14, 2)
+  netSales       Decimal  @default(0) @map("net_sales") @db.Decimal(14, 2)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  refundAmount   Decimal  @default(0) @map("refund_amount") @db.Decimal(14, 2)
+  taxAmount      Decimal  @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  shippingAmount Decimal  @default(0) @map("shipping_amount") @db.Decimal(14, 2)
+  avgOrderValue  Decimal  @default(0) @map("avg_order_value") @db.Decimal(14, 2)
+  currency       String   @default("USD") @db.Char(3)
+
+  @@unique([tenantId, storeId, metricDate])
+  @@index([tenantId, storeId, metricDate(sort: Desc)])
+  @@map("daily_sales_metrics")
+  @@schema("app")
+}
+
+model DailyProductMetric {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  storeId        String   @map("store_id") @db.Uuid
+  metricDate     DateTime @map("metric_date") @db.Date
+  productId      String   @map("product_id") @db.Uuid
+  variantId      String?  @map("variant_id") @db.Uuid
+  unitsSold      Int      @default(0) @map("units_sold")
+  revenue        Decimal  @default(0) @db.Decimal(14, 2)
+  grossMargin    Decimal  @default(0) @map("gross_margin") @db.Decimal(14, 2)
+  views          Int      @default(0)
+  cartAdds       Int      @default(0) @map("cart_adds")
+  conversionRate Decimal  @default(0) @map("conversion_rate") @db.Decimal(8, 4)
+
+  @@index([tenantId, storeId, productId, metricDate(sort: Desc)])
+  @@map("daily_product_metrics")
+  @@schema("app")
+}
+
+model DailyCustomerMetric {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  storeId             String   @map("store_id") @db.Uuid
+  metricDate          DateTime @map("metric_date") @db.Date
+  newCustomers        Int      @default(0) @map("new_customers")
+  returningCustomers  Int      @default(0) @map("returning_customers")
+  repeatRate          Decimal  @default(0) @map("repeat_rate") @db.Decimal(8, 4)
+  avgLtv              Decimal  @default(0) @map("avg_ltv") @db.Decimal(14, 2)
+  churnRiskCount      Int      @default(0) @map("churn_risk_count")
+  vipCustomerCount    Int      @default(0) @map("vip_customer_count")
+
+  @@unique([tenantId, storeId, metricDate])
+  @@index([tenantId, storeId, metricDate(sort: Desc)])
+  @@map("daily_customer_metrics")
+  @@schema("app")
+}

@@ -1,0 +1,69 @@
+/// Persisted prediction outputs: runs, series points, insights.
+
+model PredictionRun {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  storeId             String?   @map("store_id") @db.Uuid
+  modelKey            String    @map("model_key") // revenue_forecast/churn/etc
+  modelVersion        String    @default("v1") @map("model_version")
+  status              String    @default("queued") // queued/running/success/failed
+  inputWindowStart    DateTime? @map("input_window_start") @db.Date
+  inputWindowEnd      DateTime? @map("input_window_end") @db.Date
+  forecastHorizonDays Int       @default(30) @map("forecast_horizon_days")
+  confidenceLevel     String    @default("medium") @map("confidence_level")
+  accuracyScore       Decimal?  @map("accuracy_score") @db.Decimal(8, 4)
+  mape                Decimal?  @db.Decimal(8, 4)
+  generatedAt         DateTime? @map("generated_at") @db.Timestamptz
+  errorMessage        String?   @map("error_message")
+  metadataJson        Json      @default("{}") @map("metadata_json")
+  createdByUserId     String?   @map("created_by_user_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  points PredictionSeriesPoint[]
+
+  @@index([tenantId, storeId, modelKey, generatedAt(sort: Desc)])
+  @@index([tenantId, status])
+  @@map("prediction_runs")
+  @@schema("app")
+}
+
+model PredictionSeriesPoint {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  predictionRunId String   @map("prediction_run_id") @db.Uuid
+  seriesKey       String   @map("series_key") // revenue/orders/customers
+  pointDate       DateTime @map("point_date") @db.Date
+  actualValue     Decimal? @map("actual_value") @db.Decimal(18, 4)
+  forecastValue   Decimal? @map("forecast_value") @db.Decimal(18, 4)
+  ciLow           Decimal? @map("ci_low") @db.Decimal(18, 4)
+  ciHigh          Decimal? @map("ci_high") @db.Decimal(18, 4)
+  metadataJson    Json     @default("{}") @map("metadata_json")
+
+  run PredictionRun @relation(fields: [predictionRunId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, predictionRunId])
+  @@index([tenantId, seriesKey, pointDate])
+  @@map("prediction_series_points")
+  @@schema("app")
+}
+
+model PredictionInsight {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  storeId            String?  @map("store_id") @db.Uuid
+  predictionRunId    String?  @map("prediction_run_id") @db.Uuid
+  insightType        String   @map("insight_type") // risk/opportunity/warning
+  title              String
+  description        String?
+  priority           String   @default("medium") // low/medium/high/critical
+  confidenceScore    Decimal  @default(0) @map("confidence_score") @db.Decimal(8, 4)
+  recommendedAction  String?  @map("recommended_action")
+  status             String   @default("open") // open/accepted/dismissed
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([tenantId, storeId, status])
+  @@index([tenantId, priority])
+  @@map("prediction_insights")
+  @@schema("app")
+}

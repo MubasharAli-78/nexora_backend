@@ -1,0 +1,40 @@
+/// AI-powered recommendation engine: product embeddings + per-customer results.
+
+model ProductEmbedding {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String   @map("store_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  provider    String   // openai / gemini
+  modelKey    String   @map("model_key")
+  /// SHA-256 of the text that was embedded — skip re-embedding if unchanged.
+  contentHash String   @map("content_hash")
+  /// Float vector stored as JSON array. For pgvector upgrade, replace with Unsupported("vector").
+  embedding   Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([tenantId, productId, provider, modelKey])
+  @@index([tenantId, storeId])
+  @@map("product_embeddings")
+  @@schema("app")
+}
+
+model ProductRecommendation {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String   @map("store_id") @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  rank        Int
+  score       Decimal  @db.Decimal(10, 6)
+  strategy    String   @default("embedding_similarity") @map("strategy")
+  reason      String?
+  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, customerId, rank])
+  @@index([tenantId, storeId])
+  @@map("product_recommendations")
+  @@schema("app")
+}

@@ -1,0 +1,61 @@
+/// Inventory locations, stock levels, movements.
+
+model InventoryLocation {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  storeId     String   @map("store_id") @db.Uuid
+  externalId  String?  @map("external_id")
+  name        String
+  addressJson Json     @default("{}") @map("address_json")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  levels InventoryLevel[]
+
+  @@index([tenantId, storeId])
+  @@map("inventory_locations")
+  @@schema("app")
+}
+
+model InventoryLevel {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  storeId           String   @map("store_id") @db.Uuid
+  variantId         String   @map("variant_id") @db.Uuid
+  locationId        String   @map("location_id") @db.Uuid
+  availableQuantity Int      @default(0) @map("available_quantity")
+  reservedQuantity  Int      @default(0) @map("reserved_quantity")
+  incomingQuantity  Int      @default(0) @map("incoming_quantity")
+  reorderPoint      Int      @default(0) @map("reorder_point")
+  safetyStock       Int      @default(0) @map("safety_stock")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  location InventoryLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, variantId, locationId])
+  @@index([tenantId, storeId])
+  @@index([tenantId, storeId, availableQuantity])
+  @@map("inventory_levels")
+  @@schema("app")
+}
+
+model InventoryMovement {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  storeId         String   @map("store_id") @db.Uuid
+  variantId       String   @map("variant_id") @db.Uuid
+  locationId      String   @map("location_id") @db.Uuid
+  movementType    String   @map("movement_type") // sale/return/restock/adjustment
+  quantityDelta   Int      @map("quantity_delta")
+  referenceType   String?  @map("reference_type") // order/refund/manual/sync
+  referenceId     String?  @map("reference_id") @db.Uuid
+  occurredAt      DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, storeId, occurredAt(sort: Desc)])
+  @@index([tenantId, variantId])
+  @@map("inventory_movements")
+  @@schema("app")
+}

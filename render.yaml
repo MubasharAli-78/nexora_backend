@@ -1,0 +1,98 @@
+services:
+  - type: web
+    name: nexora-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: API_PREFIX
+        value: api/v1
+
+      # Set CORS to your frontend URL after deploying frontend
+      - key: CORS_ORIGINS
+        value: http://localhost:3000
+
+      # ── Database (Supabase) ──────────────────────────────────────────
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+
+      # ── Auth / JWT ───────────────────────────────────────────────────
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_ACCESS_TTL
+        value: "900"
+      - key: JWT_ISSUER
+        value: nexora
+      - key: JWT_AUDIENCE
+        value: nexora-app
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: "30"
+      - key: SESSION_TTL_DAYS
+        value: "30"
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_DOMAIN
+        sync: false
+
+      # ── Frontend URLs ────────────────────────────────────────────────
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: INVITE_ACCEPT_PATH
+        value: /invite/accept
+      - key: PASSWORD_RESET_PATH
+        value: /reset-password
+
+      # ── SMTP ─────────────────────────────────────────────────────────
+      - key: SMTP_HOST
+        value: smtp.titan.email
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Nexora
+      - key: SMTP_USE_SSL
+        value: "true"
+      - key: SMTP_USE_TLS
+        value: "false"
+
+      # ── Redis (Upstash — leave blank to disable background jobs) ─────
+      - key: REDIS_URL
+        sync: false
+
+      # ── Supabase Storage ─────────────────────────────────────────────
+      - key: SUPABASE_S3_ENDPOINT
+        sync: false
+      - key: SUPABASE_S3_REGION
+        value: ap-southeast-2
+      - key: SUPABASE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: STORAGE_BUCKET_PRIVATE
+        value: nexora-private
+      - key: STORAGE_BUCKET_PRODUCT
+        value: nexora-product-assets
+      - key: STORAGE_BUCKET_PUBLIC
+        value: nexora-public
+
+      # ── AI (optional) ────────────────────────────────────────────────
+      - key: AI_PROVIDER
+        value: none
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

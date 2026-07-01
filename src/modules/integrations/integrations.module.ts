@@ -166,7 +166,7 @@ export class IntegrationsController {
     return this.integrations.syncRuns(ctx, integrationId);
   }
 
-  /** Public webhook receiver. Stores raw event + HMAC verification result for async processing. */
+  /** Public webhook receiver. Stores raw event + HMAC verification result, then processes order topics into the canonical `Order` table. */
   @Public()
   @Post('webhooks/:providerKey')
   async webhook(@Param('providerKey') providerKey: string, @Req() req: Request) {
@@ -175,19 +175,26 @@ export class IntegrationsController {
     const headers: Record<string, string | undefined> = {};
     for (const [k, v] of Object.entries(req.headers)) headers[k] = Array.isArray(v) ? v[0] : v;
 
+    // Shopify signs webhooks with the app's API secret key, not a per-shop secret.
+    const secret = providerKey === 'shopify' ? process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET : undefined;
     let result: { valid: boolean; topic?: string; externalEventId?: string } = {
       valid: false,
       topic: headers['x-shopify-topic'],
       externalEventId: headers['x-shopify-webhook-id'],
     };
     if (connector) {
-      result = await connector.verifyWebhook({ rawBody, headers });
+      result = await connector.verifyWebhook({ rawBody, headers, secret });
     }
+
+    const shopDomain = headers['x-shopify-shop-domain'];
+    const integration = result.valid && shopDomain
+      ? await this.prisma.tenantIntegration.findFirst({ where: { provider: { key: providerKey }, externalShopDomain: shopDomain, status: 'connected' } })
+      : null;
 
     const externalEventId = result.externalEventId ?? `${providerKey}-${Date.now()}`;
     await this.prisma.webhookEvent.upsert({
       where: { providerKey_externalEventId: { providerKey, externalEventId } },
-      update: { signatureValid: result.valid, status: 'received' },
+      update: { signatureValid: result.valid, status: 'received', tenantId: integration?.tenantId, integrationId: integration?.id },
       create: {
         providerKey,
         eventType: result.topic ?? 'unknown',
@@ -196,8 +203,25 @@ export class IntegrationsController {
         payloadJson: (req.body as object) ?? {},
         signatureValid: result.valid,
         status: 'received',
+        tenantId: integration?.tenantId,
+        integrationId: integration?.id,
       },
     });
+
+    if (result.valid && integration && result.topic?.startsWith('orders/')) {
+      try {
+        await this.sync.processOrderWebhook(providerKey, integration, req.body);
+        await this.prisma.webhookEvent.update({
+          where: { providerKey_externalEventId: { providerKey, externalEventId } },
+          data: { status: 'processed', processedAt: new Date() },
+        });
+      } catch (err) {
+        await this.prisma.webhookEvent.update({
+          where: { providerKey_externalEventId: { providerKey, externalEventId } },
+          data: { status: 'failed', processedAt: new Date() },
+        });
+      }
+    }
     return { received: true };
   }
 }

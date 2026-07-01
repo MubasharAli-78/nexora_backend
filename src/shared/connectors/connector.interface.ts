@@ -122,4 +122,6 @@ export interface CommerceConnector {
   listCustomers(creds: ConnectorCredentials, cursor?: string): Promise<ConnectorPage<NormalizedCustomer>>;
   listOrders(creds: ConnectorCredentials, cursor?: string): Promise<ConnectorPage<NormalizedOrder>>;
   listInventory(creds: ConnectorCredentials, cursor?: string): Promise<ConnectorPage<NormalizedInventoryLevel>>;
+  /** Normalizes a single order webhook payload (e.g. `orders/create`) into the same shape `listOrders` produces. */
+  normalizeOrderPayload?(raw: unknown): NormalizedOrder | null;
 }

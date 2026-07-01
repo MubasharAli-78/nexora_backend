@@ -179,42 +179,50 @@ export class ShopifyConnector implements CommerceConnector {
   async listOrders(creds: ConnectorCredentials): Promise<ConnectorPage<NormalizedOrder>> {
     const orders = await this.fetchAllItems(creds, 'orders.json?status=any&limit=250', 'orders');
     if (!orders.length) return { items: [] };
-    return {
-      items: orders.map((o: any): NormalizedOrder => ({
-        externalSource: 'shopify',
-        externalId: String(o.id),
-        orderNumber: String(o.order_number ?? o.name),
-        customerExternalId: o.customer ? String(o.customer.id) : undefined,
-        financialStatus: o.financial_status ?? 'pending',
-        fulfillmentStatus: o.fulfillment_status ?? 'unfulfilled',
-        cancelledAt: o.cancelled_at ?? null,
-        currency: o.currency ?? 'USD',
-        subtotalAmount: Number(o.subtotal_price ?? 0),
-        totalAmount: Number(o.total_price ?? 0),
-        discountAmount: Number(o.total_discounts ?? 0),
-        taxAmount: Number(o.total_tax ?? 0),
-        shippingAmount: (o.shipping_lines ?? []).reduce((a: number, s: any) => a + Number(s.price ?? 0), 0),
-        refundAmount: (o.refunds ?? []).reduce(
-          (a: number, r: any) => a + (r.transactions ?? []).reduce((ta: number, tr: any) => ta + Number(tr.amount ?? 0), 0),
-          0,
-        ),
-        paymentMethod: o.payment_gateway_names?.[0] ?? o.gateway ?? null,
-        processedAt: o.processed_at ?? o.created_at,
-        items: (o.line_items ?? []).map((li: any) => ({
-          externalLineItemId: String(li.id),
-          productExternalId: li.product_id != null ? String(li.product_id) : undefined,
-          title: li.title,
-          sku: li.sku,
-          quantity: li.quantity,
-          unitPrice: Number(li.price ?? 0),
-          total: Number(li.price ?? 0) * (li.quantity ?? 1),
-        })),
-        rawPayload: o,
-      })),
-    };
+    return { items: orders.map((o: any) => this.mapOrder(o)) };
   }
 
   async listInventory(): Promise<ConnectorPage<NormalizedInventoryLevel>> {
     return { items: [] };
+  }
+
+  /** Normalizes a single Shopify order webhook payload (`orders/create`, `orders/updated`, ...) using the same mapping as `listOrders`. */
+  normalizeOrderPayload(raw: unknown): NormalizedOrder | null {
+    if (!raw || typeof raw !== 'object' || !(raw as { id?: unknown }).id) return null;
+    return this.mapOrder(raw as any);
+  }
+
+  private mapOrder(o: any): NormalizedOrder {
+    return {
+      externalSource: 'shopify',
+      externalId: String(o.id),
+      orderNumber: String(o.order_number ?? o.name),
+      customerExternalId: o.customer ? String(o.customer.id) : undefined,
+      financialStatus: o.financial_status ?? 'pending',
+      fulfillmentStatus: o.fulfillment_status ?? 'unfulfilled',
+      cancelledAt: o.cancelled_at ?? null,
+      currency: o.currency ?? 'USD',
+      subtotalAmount: Number(o.subtotal_price ?? 0),
+      totalAmount: Number(o.total_price ?? 0),
+      discountAmount: Number(o.total_discounts ?? 0),
+      taxAmount: Number(o.total_tax ?? 0),
+      shippingAmount: (o.shipping_lines ?? []).reduce((a: number, s: any) => a + Number(s.price ?? 0), 0),
+      refundAmount: (o.refunds ?? []).reduce(
+        (a: number, r: any) => a + (r.transactions ?? []).reduce((ta: number, tr: any) => ta + Number(tr.amount ?? 0), 0),
+        0,
+      ),
+      paymentMethod: o.payment_gateway_names?.[0] ?? o.gateway ?? null,
+      processedAt: o.processed_at ?? o.created_at,
+      items: (o.line_items ?? []).map((li: any) => ({
+        externalLineItemId: String(li.id),
+        productExternalId: li.product_id != null ? String(li.product_id) : undefined,
+        title: li.title,
+        sku: li.sku,
+        quantity: li.quantity,
+        unitPrice: Number(li.price ?? 0),
+        total: Number(li.price ?? 0) * (li.quantity ?? 1),
+      })),
+      rawPayload: o,
+    };
   }
 }

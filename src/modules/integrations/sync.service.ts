@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { TenantIntegration } from '@prisma/client';
 import { PrismaService, TxClient } from '../../shared/database/prisma.service';
 import { ConnectorRegistry } from '../../shared/connectors/connector-registry';
 import { FieldEncryptionService } from '../../shared/security/field-encryption.service';
@@ -76,6 +77,26 @@ export class SyncService {
         return { runId: run.id, status: 'failed', error: (err as Error).message };
       }
     });
+  }
+
+  /**
+   * Processes a single order webhook payload (`orders/create`, `orders/updated`, ...) into the
+   * canonical `Order` row, bypassing the manual/queued full sync path. `integration` must already
+   * be resolved (by external shop domain) and have signature verification passed.
+   */
+  async processOrderWebhook(providerKey: string, integration: TenantIntegration, payload: unknown) {
+    if (!integration.storeId) return { status: 'no_store' };
+    const connector = this.registry.get(providerKey);
+    if (!connector.normalizeOrderPayload) return { status: 'unsupported' };
+    const normalized = connector.normalizeOrderPayload(payload);
+    if (!normalized) return { status: 'invalid_payload' };
+
+    const counters: SyncCounters = { read: 0, created: 0, updated: 0, failed: 0 };
+    await this.prisma.withTenantContext(
+      { tenantId: integration.tenantId, userId: '', membershipId: '' },
+      (tx) => this.upsertOrder(tx, integration.tenantId, integration.storeId as string, integration.id, normalized, counters),
+    );
+    return { status: 'processed', ...counters };
   }
 
   private decryptCreds(encrypted: unknown): ConnectorCredentials {
